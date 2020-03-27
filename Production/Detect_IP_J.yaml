@@ -1,0 +1,48 @@
+---
+- name: Search for IP in the Network
+  hosts:
+   - vMX
+  roles:
+   - Juniper.junos
+  connection: local
+  gather_facts: no
+
+  vars_prompt:
+  - name: IP
+    prompt: Insert IP to be searched
+    private: no
+
+  - name: username
+    prompt: Junos Username
+    private: no
+
+  - name: password
+    prompt: Junos Password
+
+  tasks:
+  - name: get interface information
+    juniper_junos_rpc:
+     rpcs:
+      - get-interface-information
+     formats: xml
+     provider:
+      host: "{{ ansible_host }}"
+      user: "{{ username }}"
+      passwd: "{{ password }}"
+    register: interfaces
+
+  - name: query interface information
+    xml:
+     xmlstring: "{{ interfaces.stdout }}"
+     xpath: //logical-interface/address-family[address-family-name='inet']/interface-address/ifa-local
+     content: text
+    register: ip_addr
+
+  - name: Define new Var (Result is a list)
+    set_fact:
+      ip_values: "{{ ip_addr.matches | map(attribute='ifa-local') | list }}"
+
+  - name: Print condition true
+    debug:
+     msg: "The IP {{IP}} is configured on the device {{ansible_host}}" 
+    when: IP in ip_values
